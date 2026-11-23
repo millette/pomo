@@ -228,6 +228,28 @@ work:
 
 > Commands run with a 5 second timeout and are automatically cancelled when starting the next session.
 
+### Session Details for Commands
+
+Commands in `then` receive the session that just ended through their environment:
+
+<!-- prettier-ignore -->
+| Variable               | Example                     | Meaning                                              |
+| ---------------------- | --------------------------- | ---------------------------------------------------- |
+| `POMO_TYPE`            | `work`                      | `work` or `break`                                    |
+| `POMO_TITLE`           | `write report`              | Title shown in the timer                             |
+| `POMO_DURATION`        | `1500`                      | Planned duration in seconds, including time added    |
+| `POMO_ELAPSED`         | `1500`                      | Seconds the timer actually ran                       |
+| `POMO_STARTED_AT`      | `2026-11-23T09:00:00-05:00` | When the session started                             |
+| `POMO_LONG_BREAK_NEXT` | `true`                      | `true` when a long break follows this work session   |
+
+For example, to log every completed work session:
+
+```yaml
+work:
+  then:
+    - [sh, -c, 'echo "$POMO_STARTED_AT $POMO_TITLE ($POMO_ELAPSED s)" >> ~/pomo.log']
+```
+
 ### Key Bindings
 
 #### Timer Controls

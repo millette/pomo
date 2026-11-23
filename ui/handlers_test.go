@@ -65,3 +65,55 @@ func TestStartSessionSetsStartTime(t *testing.T) {
 		t.Errorf("sessionStart = %v, want a time after %v", m.sessionStart, before)
 	}
 }
+
+func TestLongBreakNext(t *testing.T) {
+	tests := []struct {
+		name     string
+		enabled  bool
+		taskType config.TaskType
+		position int
+		want     bool
+	}{
+		{"last work session of the cycle", true, config.WorkTask, 4, true},
+		{"earlier work session", true, config.WorkTask, 3, false},
+		{"break session", true, config.BreakTask, 4, false},
+		{"long breaks disabled", false, config.WorkTask, 4, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := Model{
+				longBreak:       config.LongBreak{Enabled: tt.enabled, After: 4},
+				currentTaskType: tt.taskType,
+				cyclePosition:   tt.position,
+			}
+
+			if got := m.longBreakNext(); got != tt.want {
+				t.Errorf("longBreakNext() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEndedSession(t *testing.T) {
+	start := time.Now().Add(-25 * time.Minute)
+	m := Model{
+		longBreak:       config.LongBreak{Enabled: true, After: 4},
+		currentTaskType: config.WorkTask,
+		currentTask:     config.Task{Title: "write report", Duration: 25 * time.Minute},
+		cyclePosition:   4,
+		sessionStart:    start,
+		duration:        26 * time.Minute, // a minute was added during the session
+		elapsed:         26 * time.Minute,
+	}
+
+	got := m.endedSession()
+
+	if got.Type != "work" || got.Title != "write report" || !got.LongBreakNext {
+		t.Errorf("endedSession() = %+v, want a work session titled %q before a long break", got, "write report")
+	}
+
+	if got.Duration != 26*time.Minute || got.Elapsed != 26*time.Minute || !got.StartedAt.Equal(start) {
+		t.Errorf("endedSession() = %+v, want 26m planned and elapsed, started at %v", got, start)
+	}
+}

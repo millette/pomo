@@ -100,7 +100,7 @@
             "minItems": 1,
             "description": "Command and arguments"
           },
-          "description": "Commands to run after session completion",
+          "description": "Commands to run after session completion. They receive the ended session in POMO_TYPE, POMO_TITLE, POMO_DURATION, POMO_ELAPSED, POMO_STARTED_AT and POMO_LONG_BREAK_NEXT",
           "examples": [[["spd-say", "Break time!"]]]
         }
       },

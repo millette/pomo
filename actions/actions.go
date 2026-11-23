@@ -4,7 +4,9 @@ package actions
 import (
 	"context"
 	"log"
+	"os"
 	"os/exec"
+	"strconv"
 	"sync"
 	"time"
 
@@ -14,10 +16,40 @@ import (
 
 var CommandTimeout = 5 * time.Second
 
+// Session describes the session that just ended.
+// Post commands receive it through their environment.
+type Session struct {
+	Type          string        // "work" or "break"
+	Title         string        // title shown in the timer
+	Duration      time.Duration // planned duration, including any time added
+	Elapsed       time.Duration // time the timer actually ran
+	StartedAt     time.Time     // when the session started
+	LongBreakNext bool          // a long break follows this work session
+}
+
+// Environ returns the session as environment variables,
+// in the form "key=value".
+//
+// durations are in whole seconds
+func (s Session) Environ() []string {
+	seconds := func(d time.Duration) string {
+		return strconv.Itoa(int(d.Seconds()))
+	}
+
+	return []string{
+		"POMO_TYPE=" + s.Type,
+		"POMO_TITLE=" + s.Title,
+		"POMO_DURATION=" + seconds(s.Duration),
+		"POMO_ELAPSED=" + seconds(s.Elapsed),
+		"POMO_STARTED_AT=" + s.StartedAt.Format(time.RFC3339),
+		"POMO_LONG_BREAK_NEXT=" + strconv.FormatBool(s.LongBreakNext),
+	}
+}
+
 // RunPostActions sends task notification and runs post commands using goroutines
 //
 // returns a wait group to wait for their completion
-func RunPostActions(ctx context.Context, task config.Task) *sync.WaitGroup {
+func RunPostActions(ctx context.Context, task config.Task, session Session) *sync.WaitGroup {
 	var wg sync.WaitGroup
 
 	wg.Go(func() {
@@ -25,7 +57,7 @@ func RunPostActions(ctx context.Context, task config.Task) *sync.WaitGroup {
 	})
 
 	wg.Go(func() {
-		runPostCommands(ctx, task.Then)
+		runPostCommands(ctx, task.Then, session)
 	})
 
 	return &wg
@@ -61,12 +93,16 @@ func sendNotification(notification config.Notification) {
 	}
 }
 
-// runs the post commands specified in the task
-func runPostCommands(ctx context.Context, cmds [][]string) {
+// runs the post commands specified in the task,
+// with the ended session added to their environment
+func runPostCommands(ctx context.Context, cmds [][]string, session Session) {
 	log.Println("running post commands")
+
+	env := append(os.Environ(), session.Environ()...)
 
 	for _, cmd := range cmds {
 		c := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
+		c.Env = env
 
 		if err := c.Run(); err != nil {
 			// TODO: show error message

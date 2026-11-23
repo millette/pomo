@@ -176,7 +176,7 @@ func (m *Model) handleCompletion() tea.Cmd {
 
 	ctx, cancel := context.WithTimeout(context.Background(), actions.CommandTimeout)
 	m.commandsCancel = cancel
-	m.commandsWg = actions.RunPostActions(ctx, m.currentTask)
+	m.commandsWg = actions.RunPostActions(ctx, m.currentTask, m.endedSession())
 
 	// continue after the completion according to config
 	switch m.onSessionEnd {
@@ -198,6 +198,26 @@ func (m *Model) handleCompletion() tea.Cmd {
 	}
 }
 
+// reports whether a long break follows the current session,
+// which is the last work session of a cycle
+func (m *Model) longBreakNext() bool {
+	return m.longBreak.Enabled &&
+		m.currentTaskType == config.WorkTask &&
+		m.cyclePosition == m.longBreak.After
+}
+
+// describes the current session for the post commands
+func (m *Model) endedSession() actions.Session {
+	return actions.Session{
+		Type:          string(db.GetSessionType(m.currentTaskType)),
+		Title:         m.currentTask.Title,
+		Duration:      m.duration,
+		Elapsed:       m.elapsed,
+		StartedAt:     m.sessionStart,
+		LongBreakNext: m.longBreakNext(),
+	}
+}
+
 // starts session with the opposite task type (work <-> break)
 // handles long break logic if enabled
 func (m *Model) nextSession() tea.Cmd {
@@ -208,7 +228,7 @@ func (m *Model) nextSession() tea.Cmd {
 		}
 
 		// start long break if cycle position reaches configured value after a work session
-		if m.currentTaskType == config.WorkTask && m.cyclePosition == m.longBreak.After {
+		if m.longBreakNext() {
 			return m.longBreakSession()
 		}
 
