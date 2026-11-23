@@ -90,6 +90,19 @@
           "$ref": "#/definitions/notification",
           "description": "Desktop notification settings"
         },
+        "start": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "description": "Command and arguments"
+          },
+          "description": "Commands to run when the session starts. They receive the session in POMO_TYPE, POMO_TITLE, POMO_DURATION, POMO_ELAPSED, POMO_STARTED_AT, POMO_LONG_BREAK and POMO_LONG_BREAK_NEXT",
+          "examples": [[["spd-say", "Break started"]]]
+        },
         "then": {
           "type": "array",
           "items": {
@@ -100,7 +113,7 @@
             "minItems": 1,
             "description": "Command and arguments"
           },
-          "description": "Commands to run after session completion. They receive the ended session in POMO_TYPE, POMO_TITLE, POMO_DURATION, POMO_ELAPSED, POMO_STARTED_AT and POMO_LONG_BREAK_NEXT",
+          "description": "Commands to run after session completion. They receive the ended session in POMO_TYPE, POMO_TITLE, POMO_DURATION, POMO_ELAPSED, POMO_STARTED_AT, POMO_LONG_BREAK and POMO_LONG_BREAK_NEXT",
           "examples": [[["spd-say", "Break time!"]]]
         }
       },

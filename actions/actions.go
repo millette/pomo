@@ -1,4 +1,5 @@
-// Package actions provides functionality to run post actions after a task is completed.
+// Package actions provides functionality to run commands when a session starts
+// and post actions after it is completed.
 package actions
 
 import (
@@ -16,14 +17,15 @@ import (
 
 var CommandTimeout = 5 * time.Second
 
-// Session describes the session that just ended.
-// Post commands receive it through their environment.
+// Session describes the session that just started or ended.
+// Start and post commands receive it through their environment.
 type Session struct {
 	Type          string        // "work" or "break"
 	Title         string        // title shown in the timer
 	Duration      time.Duration // planned duration, including any time added
 	Elapsed       time.Duration // time the timer actually ran
 	StartedAt     time.Time     // when the session started
+	LongBreak     bool          // the session is a long break
 	LongBreakNext bool          // a long break follows this work session
 }
 
@@ -42,8 +44,23 @@ func (s Session) Environ() []string {
 		"POMO_DURATION=" + seconds(s.Duration),
 		"POMO_ELAPSED=" + seconds(s.Elapsed),
 		"POMO_STARTED_AT=" + s.StartedAt.Format(time.RFC3339),
+		"POMO_LONG_BREAK=" + strconv.FormatBool(s.LongBreak),
 		"POMO_LONG_BREAK_NEXT=" + strconv.FormatBool(s.LongBreakNext),
 	}
+}
+
+// RunStartActions runs the start commands of a session that just started,
+// using a goroutine
+//
+// returns a wait group to wait for their completion
+func RunStartActions(ctx context.Context, task config.Task, session Session) *sync.WaitGroup {
+	var wg sync.WaitGroup
+
+	wg.Go(func() {
+		runCommands(ctx, task.Start, session)
+	})
+
+	return &wg
 }
 
 // RunPostActions sends task notification and runs post commands using goroutines
@@ -57,7 +74,7 @@ func RunPostActions(ctx context.Context, task config.Task, session Session) *syn
 	})
 
 	wg.Go(func() {
-		runPostCommands(ctx, task.Then, session)
+		runCommands(ctx, task.Then, session)
 	})
 
 	return &wg
@@ -93,10 +110,10 @@ func sendNotification(notification config.Notification) {
 	}
 }
 
-// runs the post commands specified in the task,
-// with the ended session added to their environment
-func runPostCommands(ctx context.Context, cmds [][]string, session Session) {
-	log.Println("running post commands")
+// runs the commands of a task, one after the other,
+// with the session added to their environment
+func runCommands(ctx context.Context, cmds [][]string, session Session) {
+	log.Println("running commands")
 
 	env := append(os.Environ(), session.Environ()...)
 

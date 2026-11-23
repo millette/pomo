@@ -10,6 +10,9 @@ import (
 )
 
 func (m Model) Init() tea.Cmd {
+	// the first session starts with the program
+	m.runStartCommands()
+
 	return m.timer.Init()
 }
 

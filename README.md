@@ -18,7 +18,7 @@ A simple, customizable Pomodoro timer for your terminal, built with [Bubble Tea]
 - ⏭️ Skip to next session
 - 🔔 Cross-platform desktop notifications
 - 🎨 Clean, minimal terminal UI with ASCII art timer fonts
-- 🛠️ Custom commands when timers complete
+- 🛠️ Custom commands when sessions start and complete
 
 ### Statistics
 
@@ -228,9 +228,23 @@ work:
 
 > Commands run with a 5 second timeout and are automatically cancelled when starting the next session.
 
+### Commands at Session Start
+
+Commands in `start` run when a session starts: the first one when pomo launches,
+the following ones after the confirmation prompt, if there is one.
+
+```yaml
+break:
+  start:
+    - [spd-say, "Break started"]
+```
+
+> A short session (2 minutes) extends the current session, so it does not run them.
+> They have the same 5 second timeout as the `then` commands.
+
 ### Session Details for Commands
 
-Commands in `then` receive the session that just ended through their environment:
+Commands in `start` and `then` receive the session that just started or ended through their environment:
 
 <!-- prettier-ignore -->
 | Variable               | Example                     | Meaning                                              |
@@ -238,8 +252,9 @@ Commands in `then` receive the session that just ended through their environment
 | `POMO_TYPE`            | `work`                      | `work` or `break`                                    |
 | `POMO_TITLE`           | `write report`              | Title shown in the timer                             |
 | `POMO_DURATION`        | `1500`                      | Planned duration in seconds, including time added    |
-| `POMO_ELAPSED`         | `1500`                      | Seconds the timer actually ran                       |
+| `POMO_ELAPSED`         | `1500`                      | Seconds the timer actually ran; `0` in `start`       |
 | `POMO_STARTED_AT`      | `2026-11-23T09:00:00-05:00` | When the session started                             |
+| `POMO_LONG_BREAK`      | `false`                     | `true` when the session is a long break              |
 | `POMO_LONG_BREAK_NEXT` | `true`                      | `true` when a long break follows this work session   |
 
 For example, to log every completed work session:

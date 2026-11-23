@@ -105,6 +105,25 @@ work:
 	assert.Equal(t, expectedThen, C.Work.Then, "Work then commands should match")
 }
 
+func TestLoadConfigStartCommands(t *testing.T) {
+	configYAML := `
+break:
+  start:
+    - ["echo", "Break started"]
+    - ["python", "~/scripts/break-start.py"]
+`
+
+	setupViper()
+	writeAndLoadConfig(t, configYAML)
+
+	expectedStart := [][]string{
+		{"echo", "Break started"},
+		{"python", homeDir + "/scripts/break-start.py"},
+	}
+	assert.Equal(t, expectedStart, C.Break.Start, "Break start commands should match")
+	assert.Empty(t, C.Work.Start, "Work start commands should be empty")
+}
+
 func TestLoadConfigAllFieldsComprehensive(t *testing.T) {
 	configYAML := `
 onSessionEnd: start

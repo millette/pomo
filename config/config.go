@@ -34,7 +34,8 @@ type Notification struct {
 type Task struct {
 	Title        string
 	Duration     time.Duration
-	Then         [][]string
+	Start        [][]string // commands to run when the session starts
+	Then         [][]string // commands to run when the session completes
 	Notification Notification
 }
 
@@ -140,7 +141,9 @@ func LoadConfig() error {
 	C.Work.Notification.Icon = expandPath(C.Work.Notification.Icon, homedir)
 	C.Break.Notification.Icon = expandPath(C.Break.Notification.Icon, homedir)
 
-	// expand post command paths
+	// expand start and post command paths
+	C.Work.Start = expandCommands(C.Work.Start, homedir)
+	C.Break.Start = expandCommands(C.Break.Start, homedir)
 	C.Work.Then = expandCommands(C.Work.Then, homedir)
 	C.Break.Then = expandCommands(C.Break.Then, homedir)
 

@@ -39,10 +39,12 @@ type Model struct {
 	currentTask      config.Task
 	sessionSummary   summary.SessionSummary
 	isShortSession   bool
+	isLongBreak      bool // the current session is a long break
 	longBreak        config.LongBreak
 	cyclePosition    int             // for long break tracking
 	commandsWg       *sync.WaitGroup // post commands wg
 	commandsCancel   context.CancelFunc
+	startWg          *sync.WaitGroup // start commands wg
 
 	// ASCII art
 	useTimerArt     bool

@@ -1,6 +1,9 @@
 package ui
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -59,7 +62,7 @@ func TestStartSessionSetsStartTime(t *testing.T) {
 	m := Model{sessionStart: time.Now().Add(-time.Hour)}
 
 	before := time.Now()
-	m.startSession(config.BreakTask, config.Task{Duration: 5 * time.Minute}, false)
+	m.startSession(config.BreakTask, config.Task{Duration: 5 * time.Minute}, false, false)
 
 	if m.sessionStart.Before(before) {
 		t.Errorf("sessionStart = %v, want a time after %v", m.sessionStart, before)
@@ -115,5 +118,83 @@ func TestEndedSession(t *testing.T) {
 
 	if got.Duration != 26*time.Minute || got.Elapsed != 26*time.Minute || !got.StartedAt.Equal(start) {
 		t.Errorf("endedSession() = %+v, want 26m planned and elapsed, started at %v", got, start)
+	}
+}
+
+func TestLongBreakSessionIsMarked(t *testing.T) {
+	m := Model{
+		longBreak:       config.LongBreak{Enabled: true, After: 4, Duration: 15 * time.Minute},
+		currentTaskType: config.WorkTask,
+		cyclePosition:   4,
+	}
+
+	m.nextSession()
+
+	if got := m.endedSession(); got.Type != "break" || !got.LongBreak {
+		t.Errorf("after the last work session of a cycle, session = %+v, want a long break", got)
+	}
+}
+
+func TestShortBreakSessionIsNotMarked(t *testing.T) {
+	m := Model{
+		longBreak:       config.LongBreak{Enabled: true, After: 4},
+		currentTaskType: config.WorkTask,
+		cyclePosition:   2,
+	}
+
+	m.nextSession()
+
+	if got := m.endedSession(); got.Type != "break" || got.LongBreak {
+		t.Errorf("after an earlier work session, session = %+v, want a break that is not long", got)
+	}
+}
+
+func TestStartSessionRunsStartCommands(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses sh")
+	}
+
+	out := filepath.Join(t.TempDir(), "started")
+	script := `printf '%s|%s|%s' "$POMO_TYPE" "$POMO_TITLE" "$POMO_LONG_BREAK" > "$1"`
+	task := config.Task{
+		Title:    "long break session",
+		Duration: 15 * time.Minute,
+		Start:    [][]string{{"sh", "-c", script, "sh", out}},
+	}
+	m := Model{}
+
+	m.startSession(config.BreakTask, task, false, true)
+	m.startWg.Wait()
+
+	got, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("the start command did not run: %v", err)
+	}
+
+	if want := "break|long break session|true"; string(got) != want {
+		t.Errorf("start command saw %q, want %q", got, want)
+	}
+}
+
+func TestShortSessionDoesNotRunStartCommands(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses sh")
+	}
+
+	out := filepath.Join(t.TempDir(), "started")
+	task := config.Task{
+		Duration: 2 * time.Minute,
+		Start:    [][]string{{"sh", "-c", `printf ran > "$1"`, "sh", out}},
+	}
+	m := Model{}
+
+	// a short session extends the current one: nothing starts
+	m.startSession(config.WorkTask, task, true, false)
+	if m.startWg != nil {
+		m.startWg.Wait()
+	}
+
+	if _, err := os.Stat(out); err == nil {
+		t.Error("the start command ran for a short session")
 	}
 }

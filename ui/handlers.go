@@ -206,7 +206,22 @@ func (m *Model) longBreakNext() bool {
 		m.cyclePosition == m.longBreak.After
 }
 
-// describes the current session for the post commands
+// runs the start commands of the current session in the background,
+// with the same time limit as the post commands
+func (m *Model) runStartCommands() {
+	ctx, cancel := context.WithTimeout(context.Background(), actions.CommandTimeout)
+
+	wg := actions.RunStartActions(ctx, m.currentTask, m.endedSession())
+	m.startWg = wg
+
+	// release the context once the commands are done
+	go func() {
+		wg.Wait()
+		cancel()
+	}()
+}
+
+// describes the current session for the start and post commands
 func (m *Model) endedSession() actions.Session {
 	return actions.Session{
 		Type:          string(db.GetSessionType(m.currentTaskType)),
@@ -214,6 +229,7 @@ func (m *Model) endedSession() actions.Session {
 		Duration:      m.duration,
 		Elapsed:       m.elapsed,
 		StartedAt:     m.sessionStart,
+		LongBreak:     m.isLongBreak,
 		LongBreakNext: m.longBreakNext(),
 	}
 }
@@ -239,7 +255,7 @@ func (m *Model) nextSession() tea.Cmd {
 	}
 
 	nextTaskType := m.currentTaskType.Opposite()
-	return m.startSession(nextTaskType, *nextTaskType.GetTask(), false)
+	return m.startSession(nextTaskType, *nextTaskType.GetTask(), false, false)
 }
 
 // starts a long break session
@@ -248,7 +264,7 @@ func (m *Model) longBreakSession() tea.Cmd {
 	longBreak.Duration = m.longBreak.Duration
 	longBreak.Title = "long " + longBreak.Title
 
-	return m.startSession(config.BreakTask, longBreak, false)
+	return m.startSession(config.BreakTask, longBreak, false, true)
 }
 
 // starts a short session of the current task type
@@ -257,11 +273,14 @@ func (m *Model) shortSession() tea.Cmd {
 	shortTask.Duration = 2 * time.Minute // TODO: make configurable
 	shortTask.Title = "short " + m.currentTaskType.GetTask().Title
 
-	return m.startSession(m.currentTaskType, shortTask, true)
+	return m.startSession(m.currentTaskType, shortTask, true, m.isLongBreak)
 }
 
 // initializes and starts a new session with the given task
-func (m *Model) startSession(taskType config.TaskType, task config.Task, isShortSession bool) tea.Cmd {
+//
+// a short session extends the current one,
+// so it does not run the start commands
+func (m *Model) startSession(taskType config.TaskType, task config.Task, isShortSession, isLongBreak bool) tea.Cmd {
 	// cancel any running post actions
 	// before starting the next session
 	//
@@ -275,6 +294,7 @@ func (m *Model) startSession(taskType config.TaskType, task config.Task, isShort
 	m.commandsWg, m.commandsCancel = nil, nil
 
 	m.isShortSession = isShortSession
+	m.isLongBreak = isLongBreak
 	m.currentTaskType = taskType
 	m.currentTask = task
 
@@ -282,6 +302,10 @@ func (m *Model) startSession(taskType config.TaskType, task config.Task, isShort
 	m.sessionStart = time.Now()
 	m.duration = m.currentTask.Duration
 	m.timer = timer.New(m.currentTask.Duration)
+
+	if !isShortSession {
+		m.runStartCommands()
+	}
 
 	m.sessionState = Running
 	return tea.Batch(
