@@ -25,9 +25,10 @@ type Model struct {
 	help          help.Model
 
 	// timer
-	timer    timer.Model
-	duration time.Duration
-	elapsed  time.Duration
+	timer        timer.Model
+	duration     time.Duration
+	elapsed      time.Duration
+	sessionStart time.Time // when the current session started
 
 	// state
 	width, height    int // window dimensions
@@ -86,8 +87,9 @@ func NewModel(taskType config.TaskType, cfg config.Config) Model {
 		confirmDialog: confirm.New(),
 		help:          help.New(),
 
-		timer:    timer.New(task.Duration),
-		duration: task.Duration,
+		timer:        timer.New(task.Duration),
+		duration:     task.Duration,
+		sessionStart: time.Now(),
 
 		onSessionEnd:    cfg.OnSessionEnd,
 		sessionState:    Running,

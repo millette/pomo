@@ -56,6 +56,7 @@ func (m *Model) handleKeys(msg tea.KeyMsg) tea.Cmd {
 
 	case key.Matches(msg, keyMap.Reset):
 		m.elapsed = 0
+		m.sessionStart = time.Now()
 		m.duration = m.currentTask.Duration
 		return m.updateProgressBar()
 
@@ -258,6 +259,7 @@ func (m *Model) startSession(taskType config.TaskType, task config.Task, isShort
 	m.currentTask = task
 
 	m.elapsed = 0
+	m.sessionStart = time.Now()
 	m.duration = m.currentTask.Duration
 	m.timer = timer.New(m.currentTask.Duration)
 
@@ -289,7 +291,7 @@ func (m *Model) recordSession() {
 	}
 
 	if err := m.repo.CreateSession(
-		time.Now(),
+		m.sessionStart,
 		m.elapsed,
 		db.GetSessionType(m.currentTaskType),
 	); err != nil {
